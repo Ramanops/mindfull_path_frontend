@@ -1,40 +1,45 @@
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  ConflictException,
+} from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
-import * as jwt from 'jsonwebtoken';
+import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../prisma.service';
 
 @Injectable()
 export class AuthService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private jwtService: JwtService,
+  ) {}
 
   // ---------------- REGISTER ----------------
-  async register(name: string, email: string, password: string) {
-    // check if email already exists
-    const existing = await this.prisma.user.findUnique({
+  async register(email: string, password: string) {
+    const existingUser = await this.prisma.user.findUnique({
       where: { email },
     });
 
-    if (existing) {
-      throw new ConflictException('Email already registered');
+    if (existingUser) {
+      throw new ConflictException('User already exists');
     }
 
-    // hash password
-    const hash = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     const user = await this.prisma.user.create({
       data: {
-        name,
         email,
-        passwordHash: hash,
+        passwordHash: hashedPassword, // ✅ correct field
       },
     });
 
-    // never return password hash
-    return {
-      id: user.id,
-      name: user.name,
+    const token = this.jwtService.sign({
+      sub: user.id,
       email: user.email,
-      createdAt: user.createdAt,
+    });
+
+    return {
+      accessToken: token,
     };
   }
 
@@ -45,29 +50,25 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new UnauthorizedException('User not found');
+      throw new UnauthorizedException('Invalid credentials');
     }
 
-    const valid = await bcrypt.compare(password, user.passwordHash);
-
-    if (!valid) {
-      throw new UnauthorizedException('Invalid password');
-    }
-
-    // create JWT token (7 days)
-    const token = jwt.sign(
-      { sub: user.id },
-      process.env.JWT_SECRET as string,
-      { expiresIn: '7d' },
+    const isMatch = await bcrypt.compare(
+      password,
+      user.passwordHash, // ✅ MUST use passwordHash
     );
 
+    if (!isMatch) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const token = this.jwtService.sign({
+      sub: user.id,
+      email: user.email,
+    });
+
     return {
-      token,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-      },
+      accessToken: token,
     };
   }
 }

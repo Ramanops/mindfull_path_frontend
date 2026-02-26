@@ -5,21 +5,25 @@ import { AuthService } from './auth.service';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  // ---------------- REGISTER ----------------
   @Post('register')
-  register(@Body() body: any) {
-    console.log('BODY RECEIVED =>', body);
-
-    if (!body) {
-      return { error: 'Send JSON body with Content-Type application/json' };
-    }
-
-    const { name, email, password } = body;
-    return this.authService.register(name, email, password);
+  register(
+    @Body() body: { email: string; password: string },
+  ) {
+    return this.authService.register(
+      body.email,
+      body.password,
+    );
   }
 
+  // ---------------- LOGIN ----------------
   @Post('login')
-  login(@Body() body: any) {
-    const { email, password } = body;
-    return this.authService.login(email, password);
+  login(
+    @Body() body: { email: string; password: string },
+  ) {
+    return this.authService.login(
+      body.email,
+      body.password,
+    );
   }
 }

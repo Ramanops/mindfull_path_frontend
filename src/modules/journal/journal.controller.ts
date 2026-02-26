@@ -1,25 +1,43 @@
-import { Body, Controller, Get, Post, Req } from '@nestjs/common';
-import { PrismaService } from '../../prisma.service';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Req,
+  UseGuards,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { Request } from 'express';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { JournalService } from './journal.service';
 
 @Controller('journal')
+@UseGuards(JwtAuthGuard) // 🔐 Protect ALL routes in this controller
 export class JournalController {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly journalService: JournalService) {}
 
   @Post()
-  create(@Req() req, @Body() body) {
-    return this.prisma.journalEntry.create({
-      data: {
-        userId: req.user.id,
-        content: body.content,
-        moodTag: body.moodTag,
-      },
-    });
+  async create(
+    @Req() req: Request & { user: any },
+    @Body() body: { content: string; moodTag?: string },
+  ) {
+    if (!req.user) {
+      throw new UnauthorizedException('User not authenticated');
+    }
+
+    return this.journalService.create(
+      req.user.id,
+      body.content,
+      body.moodTag,
+    );
   }
 
   @Get()
-  list(@Req() req) {
-    return this.prisma.journalEntry.findMany({
-      where: { userId: req.user.id },
-    });
+  async getUserJournal(@Req() req: Request & { user: any }) {
+    if (!req.user) {
+      throw new UnauthorizedException('User not authenticated');
+    }
+
+    return this.journalService.getByUser(req.user.id);
   }
 }

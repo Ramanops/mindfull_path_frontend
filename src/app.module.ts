@@ -10,7 +10,10 @@ import { authMiddleware } from './middleware/auth.middleware';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }), // loads .env globally
+    ConfigModule.forRoot({
+      isGlobal: true, // loads .env globally
+    }),
+
     AuthModule,
     JournalModule,
     MoodModule,

@@ -14,7 +14,7 @@ CREATE TABLE "MoodEntry" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "moodType" TEXT NOT NULL,
-    "intensity" INTEGER NOT NULL,
+    "intensity" SMALLINT NOT NULL,
     "note" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -48,13 +48,25 @@ CREATE TABLE "Streak" (
 CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
 
 -- CreateIndex
+CREATE INDEX "MoodEntry_userId_idx" ON "MoodEntry"("userId");
+
+-- CreateIndex
+CREATE INDEX "MoodEntry_createdAt_idx" ON "MoodEntry"("createdAt");
+
+-- CreateIndex
+CREATE INDEX "JournalEntry_userId_idx" ON "JournalEntry"("userId");
+
+-- CreateIndex
+CREATE INDEX "JournalEntry_createdAt_idx" ON "JournalEntry"("createdAt");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "Streak_userId_key" ON "Streak"("userId");
 
 -- AddForeignKey
-ALTER TABLE "MoodEntry" ADD CONSTRAINT "MoodEntry_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "MoodEntry" ADD CONSTRAINT "MoodEntry_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "JournalEntry" ADD CONSTRAINT "JournalEntry_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "JournalEntry" ADD CONSTRAINT "JournalEntry_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Streak" ADD CONSTRAINT "Streak_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Streak" ADD CONSTRAINT "Streak_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;

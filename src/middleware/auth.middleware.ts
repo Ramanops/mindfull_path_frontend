@@ -2,18 +2,27 @@ import { Request, Response, NextFunction } from 'express';
 import * as jwt from 'jsonwebtoken';
 import { httpRequests } from '../config/metrics';
 
-// Extend Express Request type
 declare module 'express-serve-static-core' {
   interface Request {
     user?: { id: string };
   }
 }
 
-// 🔐 Auth + 📊 Metrics together
 export function authMiddleware(req: Request, res: Response, next: NextFunction) {
-  // metrics count every request
   httpRequests.inc();
 
+  // 🔴 USE originalUrl — NOT path
+  const url = req.originalUrl;
+
+  // PUBLIC ROUTES
+  if (
+    url.includes('/auth/register') ||
+    url.includes('/auth/login')
+  ) {
+    return next();
+  }
+
+  // TOKEN CHECK
   const authHeader = req.headers.authorization;
   const token = authHeader?.split(' ')[1];
 
@@ -23,12 +32,10 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction) 
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as any;
-
-    // attach user to request
     req.user = { id: decoded.sub };
-
     next();
-  } catch (err) {
+
+  } catch {
     return res.status(401).json({ message: 'Invalid token' });
   }
 }
