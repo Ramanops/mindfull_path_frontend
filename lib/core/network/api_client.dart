@@ -2,21 +2,24 @@ import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class ApiClient {
-  final Dio dio = Dio();
+  late Dio dio;
   final FlutterSecureStorage storage =
   const FlutterSecureStorage();
 
   ApiClient() {
-    dio.options.baseUrl = "http://10.0.2.2:3000/api";
-    dio.options.headers = {
-      'Content-Type': 'application/json',
-    };
+    dio = Dio(
+      BaseOptions(
+        baseUrl: "http://10.0.2.2:3000/api",
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      ),
+    );
 
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          final token =
-          await storage.read(key: 'access_token');
+          final token = await storage.read(key: 'access_token');
 
           if (token != null) {
             options.headers['Authorization'] =
@@ -27,5 +30,20 @@ class ApiClient {
         },
       ),
     );
+  }
+
+  // ✅ Add this
+  Future<dynamic> post(
+      String path,
+      Map<String, dynamic> data,
+      ) async {
+    final response = await dio.post(path, data: data);
+    return response.data;
+  }
+
+  // Optional: GET
+  Future<dynamic> get(String path) async {
+    final response = await dio.get(path);
+    return response.data;
   }
 }
