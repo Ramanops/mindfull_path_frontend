@@ -1,248 +1,391 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../providers/breathing_provider.dart';
 import '../../providers/nav_provider.dart';
-import '../../widgets/breathing_circle.dart';
+import '../../features/streak/streak_provider.dart';
 
-class BreathingScreen extends ConsumerWidget {
+enum BreathPhase { inhale, hold, exhale }
+
+class BreathingPattern {
+  final String name;
+  final int inhale;
+  final int hold;
+  final int exhale;
+
+  const BreathingPattern({
+    required this.name,
+    required this.inhale,
+    required this.hold,
+    required this.exhale,
+  });
+}
+
+final patterns = [
+  BreathingPattern(name: "Calm (4-7-8)", inhale: 4, hold: 7, exhale: 8),
+  BreathingPattern(name: "Box (4-4-4)", inhale: 4, hold: 4, exhale: 4),
+];
+
+class BreathingScreen extends ConsumerStatefulWidget {
   const BreathingScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final running = ref.watch(breathingRunningProvider);
-    final cycles = ref.watch(breathingCycleProvider);
-    final sessionSeconds =
-    ref.watch(breathingSessionSecondsProvider);
+  ConsumerState<BreathingScreen> createState() =>
+      _BreathingScreenState();
+}
 
-    String formatTime(int seconds) {
-      final m = seconds ~/ 60;
-      final s = seconds % 60;
-      return "${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}";
+class _BreathingScreenState extends ConsumerState<BreathingScreen>
+    with SingleTickerProviderStateMixin {
+
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+
+  Timer? _timer;
+
+  final int _totalSeconds = 300;
+  int _remainingSeconds = 300;
+
+  BreathPhase _phase = BreathPhase.inhale;
+  int _phaseSecondsLeft = 0;
+
+  bool _running = false;
+  int _selectedIndex = 0;
+
+  BreathingPattern get pattern => patterns[_selectedIndex];
+
+  @override
+  void initState() {
+    super.initState();
+
+    _controller = AnimationController(vsync: this);
+
+    _scaleAnimation = Tween<double>(
+      begin: 0.85,
+      end: 1.1,
+    ).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Curves.easeInOut,
+      ),
+    );
+
+    _setPhase(BreathPhase.inhale);
+  }
+
+  void _exitToHome() {
+    _timer?.cancel();
+    _controller.stop();
+    _running = false;
+    ref.read(navIndexProvider.notifier).state = 0;
+  }
+
+  void _setPhase(BreathPhase phase) {
+    _phase = phase;
+
+    int duration;
+
+    if (phase == BreathPhase.inhale) {
+      duration = pattern.inhale;
+      _controller.duration = Duration(seconds: duration);
+      _controller.forward(from: 0);
+    } else if (phase == BreathPhase.hold) {
+      duration = pattern.hold;
+      _controller.stop();
+    } else {
+      duration = pattern.exhale;
+      _controller.duration = Duration(seconds: duration);
+      _controller.reverse(from: 1);
     }
 
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFFF4F7FF),
-              Color(0xFFEDEFFF),
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            children: [
+    _phaseSecondsLeft = duration;
+  }
 
-              const SizedBox(height: 10),
+  void _startBreathing() {
+    if (_running) return;
 
-              Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back),
-                    onPressed: () {
-                      ref.read(navIndexProvider.notifier).state = 0;
-                    },
-                  ),
-                  const Expanded(
-                    child: Center(
-                      child: Text(
-                        "Breathing Exercises",
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 48),
-                ],
-              ),
+    setState(() {
+      _running = true;
+      _remainingSeconds = _totalSeconds;
+      _setPhase(BreathPhase.inhale);
+    });
 
-              const SizedBox(height: 30),
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) return;
 
-              const Center(child: BreathingCircle()),
+      setState(() {
+        _remainingSeconds--;
+        _phaseSecondsLeft--;
 
-              const SizedBox(height: 20),
+        if (_phaseSecondsLeft <= 0) {
+          if (_phase == BreathPhase.inhale) {
+            _setPhase(BreathPhase.hold);
+          } else if (_phase == BreathPhase.hold) {
+            _setPhase(BreathPhase.exhale);
+          } else {
+            _setPhase(BreathPhase.inhale);
+          }
+        }
 
-              Center(
-                child: Text(
-                  formatTime(sessionSeconds),
-                  style: const TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
+        if (_remainingSeconds <= 0) {
+          _finishSession();
+        }
+      });
+    });
+  }
 
-              const SizedBox(height: 6),
+  void _finishSession() {
+    _timer?.cancel();
+    _controller.stop();
+    _running = false;
 
-              Center(
-                child: Text(
-                  "Cycle $cycles",
-                  style: const TextStyle(color: Colors.grey),
-                ),
-              ),
+    ref
+        .read(streakProvider.notifier)
+        .completeActivity(ActivityType.breathing);
 
-              const SizedBox(height: 30),
-
-              GestureDetector(
-                onTap: () {
-                  if (running) {
-                    stopBreathingSession(ref);
-                  } else {
-                    startBreathingSession(ref);
-                  }
-                },
-                child: Container(
-                  height: 60,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(30),
-                    gradient: const LinearGradient(
-                      colors: [
-                        Color(0xFF4A90E2),
-                        Color(0xFF6C63FF),
-                      ],
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        blurRadius: 20,
-                        color: Colors.blue.withOpacity(0.3),
-                        offset: const Offset(0, 8),
-                      )
-                    ],
-                  ),
-                  child: Center(
-                    child: Text(
-                      running
-                          ? "STOP BREATHING"
-                          : "START BREATHING",
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 40),
-
-              const Text(
-                "Breathing Pattern",
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              SizedBox(
-                height: 150,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  children: const [
-                    _PatternCard(
-                        title: "Calm (4-7-8)",
-                        inTime: "4s",
-                        holdTime: "7s",
-                        outTime: "8s",
-                        selected: true),
-                    SizedBox(width: 16),
-                    _PatternCard(
-                        title: "Box (4-4-4)",
-                        inTime: "4s",
-                        holdTime: "4s",
-                        outTime: "4s"),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 40),
-            ],
-          ),
-        ),
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Session Complete 🌿"),
+        content: const Text("Beautiful breathing work today!"),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _exitToHome();
+            },
+            child: const Text("Done"),
+          )
+        ],
       ),
     );
   }
-}
 
-class _PatternCard extends StatelessWidget {
-  final String title;
-  final String inTime;
-  final String holdTime;
-  final String outTime;
-  final bool selected;
+  String get formattedTime {
+    final m = _remainingSeconds ~/ 60;
+    final s = _remainingSeconds % 60;
+    return "$m:${s.toString().padLeft(2, '0')}";
+  }
 
-  const _PatternCard({
-    required this.title,
-    required this.inTime,
-    required this.holdTime,
-    required this.outTime,
-    this.selected = false,
-  });
+  String get phaseText {
+    switch (_phase) {
+      case BreathPhase.inhale:
+        return "INHALE";
+      case BreathPhase.hold:
+        return "HOLD";
+      case BreathPhase.exhale:
+        return "EXHALE";
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 220,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: selected ? Colors.white : Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(20),
-        border: selected
-            ? Border.all(color: Colors.blue, width: 2)
-            : null,
-        boxShadow: [
-          BoxShadow(
-            blurRadius: 15,
-            color: Colors.black.withOpacity(0.05),
-          )
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title,
-              style:
-              const TextStyle(fontWeight: FontWeight.bold)),
-          const Spacer(),
-          Row(
-            mainAxisAlignment:
-            MainAxisAlignment.spaceBetween,
-            children: [
-              _miniBox("IN", inTime),
-              _miniBox("HOLD", holdTime),
-              _miniBox("OUT", outTime),
-            ],
-          )
-        ],
-      ),
-    );
-  }
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) _exitToHome();
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF4F5FA),
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
 
-  Widget _miniBox(String label, String value) {
-    return Container(
-      width: 55,
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        children: [
-          Text(label,
-              style: const TextStyle(
-                  fontSize: 10, color: Colors.grey)),
-          Text(value,
-              style: const TextStyle(
-                  fontWeight: FontWeight.bold)),
-        ],
+                /// HEADER
+                Row(
+                  children: [
+                    IconButton(
+                      onPressed: _exitToHome,
+                      icon: const Icon(Icons.arrow_back),
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      "Breathing",
+                      style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600),
+                    ),
+                    const Spacer(),
+                    const Icon(Icons.info_outline)
+                  ],
+                ),
+
+                const SizedBox(height: 20),
+
+                /// TOP CARD
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        blurRadius: 15,
+                        color: Colors.black.withValues(alpha: 0.05),
+                      )
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+
+                      const Text(
+                        "Find Your Center",
+                        style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      /// BREATHING ORB WITH PHASE
+                      AnimatedBuilder(
+                        animation: _scaleAnimation,
+                        builder: (_, __) => Transform.scale(
+                          scale: _scaleAnimation.value,
+                          child: Container(
+                            height: 160,
+                            width: 160,
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: LinearGradient(
+                                colors: [
+                                  Color(0xFF8E9FFF),
+                                  Color(0xFF6C63FF),
+                                ],
+                              ),
+                            ),
+                            child: Column(
+                              mainAxisAlignment:
+                              MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  phaseText,
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 18,
+                                      fontWeight:
+                                      FontWeight.bold),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  _phaseSecondsLeft.toString(),
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 28,
+                                      fontWeight:
+                                      FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      /// SESSION TIMER
+                      Text(
+                        formattedTime,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      ElevatedButton.icon(
+                        onPressed:
+                        _running ? null : _startBreathing,
+                        icon: const Icon(Icons.play_arrow),
+                        label: const Text("START BREATHING"),
+                        style: ElevatedButton.styleFrom(
+                          minimumSize:
+                          const Size.fromHeight(55),
+                          backgroundColor:
+                          const Color(0xFF6C63FF),
+                          foregroundColor:
+                          Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius:
+                            BorderRadius.circular(30),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 30),
+
+                /// SELECT PATTERN
+                const Text(
+                  "Select a Pattern",
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold),
+                ),
+
+                const SizedBox(height: 12),
+
+                Column(
+                  children: List.generate(patterns.length, (index) {
+                    final selected = index == _selectedIndex;
+
+                    return GestureDetector(
+                      onTap: () {
+                        if (_running) return;
+                        setState(() => _selectedIndex = index);
+                      },
+                      child: Container(
+                        margin:
+                        const EdgeInsets.only(bottom: 12),
+                        padding:
+                        const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? const Color(0xFFE8E9FF)
+                              : Colors.white,
+                          borderRadius:
+                          BorderRadius.circular(16),
+                          border: Border.all(
+                            color: selected
+                                ? const Color(0xFF6C63FF)
+                                : Colors.grey.shade300,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                patterns[index].name,
+                                style: const TextStyle(
+                                    fontWeight:
+                                    FontWeight.w600),
+                              ),
+                            ),
+                            if (selected)
+                              const Icon(Icons.check,
+                                  color:
+                                  Color(0xFF6C63FF))
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

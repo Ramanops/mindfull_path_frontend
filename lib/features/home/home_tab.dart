@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../widgets/stat_card.dart';
 import '../../theme/app_text_styles.dart';
 import '../../core/constants/app_constants.dart';
 import '../../providers/nav_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../features/streak/streak_provider.dart'; // ✅ FIXED
 
 import '../meditation/meditation_screen.dart';
 import '../journal/journal_screen.dart';
@@ -16,6 +16,7 @@ class HomeTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final userEmail = ref.watch(authProvider);
+    final streakState = ref.watch(streakProvider);
 
     return SafeArea(
       child: ListView(
@@ -42,7 +43,18 @@ class HomeTab extends ConsumerWidget {
             ),
           ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
+
+          /// 🔥 Streak
+          Text(
+            "🔥 ${streakState.currentStreak} day streak",
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+
+          const SizedBox(height: 30),
 
           /// Question
           Text(
@@ -50,30 +62,9 @@ class HomeTab extends ConsumerWidget {
             style: AppTextStyles.body,
           ),
 
-          const SizedBox(height: 24),
-
-          /// Stats Row
-          Row(
-            children: const [
-              Expanded(
-                child: StatCard(
-                  title: "Current Streak",
-                  value: "12 days",
-                ),
-              ),
-              SizedBox(width: 12),
-              Expanded(
-                child: StatCard(
-                  title: "Daily Goal",
-                  value: "75%",
-                ),
-              ),
-            ],
-          ),
-
           const SizedBox(height: 32),
 
-          /// Quick Activities Title
+          /// Quick Activities
           Text(
             "Quick Activities",
             style: AppTextStyles.headline,
@@ -81,7 +72,6 @@ class HomeTab extends ConsumerWidget {
 
           const SizedBox(height: 16),
 
-          /// Guided Meditation
           _buildActivityTile(
             context,
             icon: Icons.self_improvement,
@@ -97,7 +87,6 @@ class HomeTab extends ConsumerWidget {
             },
           ),
 
-          /// Breathing Exercise
           _buildActivityTile(
             context,
             icon: Icons.air,
@@ -108,7 +97,6 @@ class HomeTab extends ConsumerWidget {
             },
           ),
 
-          /// Daily Journal
           _buildActivityTile(
             context,
             icon: Icons.book,
@@ -124,7 +112,6 @@ class HomeTab extends ConsumerWidget {
             },
           ),
 
-          /// Mood Check-in
           _buildActivityTile(
             context,
             icon: Icons.mood,

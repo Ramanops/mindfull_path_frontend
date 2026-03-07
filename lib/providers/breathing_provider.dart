@@ -3,91 +3,164 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 enum BreathPhase { inhale, hold, exhale }
 
-final breathingRunningProvider =
-StateProvider<bool>((ref) => false);
+final breathingProvider =
+StateNotifierProvider<BreathingNotifier, BreathingState>(
+      (ref) => BreathingNotifier(),
+);
 
-final breathingPhaseProvider =
-StateProvider<BreathPhase>((ref) => BreathPhase.inhale);
+class BreathingState {
+  final bool isRunning;
+  final BreathPhase phase;
+  final int phaseSeconds;
+  final int cycle;
+  final int sessionSeconds;
 
-final breathingPhaseSecondsProvider =
-StateProvider<int>((ref) => 4);
+  const BreathingState({
+    required this.isRunning,
+    required this.phase,
+    required this.phaseSeconds,
+    required this.cycle,
+    required this.sessionSeconds,
+  });
 
-final breathingCycleProvider =
-StateProvider<int>((ref) => 0);
-
-final breathingSessionSecondsProvider =
-StateProvider<int>((ref) => 300);
-
-Timer? _timer;
-
-void startBreathingSession(WidgetRef ref) {
-  stopBreathingSession(ref); // 🔥 Always cancel previous safely
-
-  ref.read(breathingRunningProvider.notifier).state = true;
-  ref.read(breathingSessionSecondsProvider.notifier).state = 300;
-  ref.read(breathingCycleProvider.notifier).state = 0;
-  ref.read(breathingPhaseProvider.notifier).state =
-      BreathPhase.inhale;
-  ref.read(breathingPhaseSecondsProvider.notifier).state = 4;
-
-  _timer = Timer.periodic(
-    const Duration(seconds: 1),
-        (_) => _tick(ref),
-  );
-}
-
-void stopBreathingSession(WidgetRef ref) {
-  _timer?.cancel();
-  _timer = null;
-  ref.read(breathingRunningProvider.notifier).state = false;
-}
-
-void _tick(WidgetRef ref) {
-  final session =
-  ref.read(breathingSessionSecondsProvider);
-
-  if (session <= 0) {
-    stopBreathingSession(ref);
-    return;
+  factory BreathingState.initial() {
+    return const BreathingState(
+      isRunning: false,
+      phase: BreathPhase.inhale,
+      phaseSeconds: 4,
+      cycle: 0,
+      sessionSeconds: 300, // 5 minutes
+    );
   }
 
-  ref
-      .read(breathingSessionSecondsProvider.notifier)
-      .state--;
-
-  _updatePhase(ref);
+  BreathingState copyWith({
+    bool? isRunning,
+    BreathPhase? phase,
+    int? phaseSeconds,
+    int? cycle,
+    int? sessionSeconds,
+  }) {
+    return BreathingState(
+      isRunning: isRunning ?? this.isRunning,
+      phase: phase ?? this.phase,
+      phaseSeconds: phaseSeconds ?? this.phaseSeconds,
+      cycle: cycle ?? this.cycle,
+      sessionSeconds: sessionSeconds ?? this.sessionSeconds,
+    );
+  }
 }
 
-void _updatePhase(WidgetRef ref) {
-  final phase = ref.read(breathingPhaseProvider);
-  final seconds =
-  ref.read(breathingPhaseSecondsProvider);
+class BreathingNotifier extends StateNotifier<BreathingState> {
+  Timer? _timer;
+  DateTime? _sessionStart;
+  DateTime? _phaseStart;
 
-  if (seconds > 1) {
-    ref
-        .read(breathingPhaseSecondsProvider.notifier)
-        .state--;
-    return;
+  static const int _totalSessionSeconds = 300;
+
+  BreathingNotifier() : super(BreathingState.initial());
+
+  // ---------------- START ----------------
+
+  void startSession() {
+    if (state.isRunning || _timer != null) return;
+
+    _sessionStart = DateTime.now();
+    _phaseStart = DateTime.now();
+
+    state = BreathingState.initial().copyWith(isRunning: true);
+
+    _timer = Timer.periodic(
+      const Duration(seconds: 1),
+          (_) => _tick(),
+    );
   }
 
-  switch (phase) {
-    case BreathPhase.inhale:
-      ref.read(breathingPhaseProvider.notifier).state =
-          BreathPhase.hold;
-      ref.read(breathingPhaseSecondsProvider.notifier).state = 7;
-      break;
+  // ---------------- TICK ----------------
 
-    case BreathPhase.hold:
-      ref.read(breathingPhaseProvider.notifier).state =
-          BreathPhase.exhale;
-      ref.read(breathingPhaseSecondsProvider.notifier).state = 8;
-      break;
+  void _tick() {
+    if (!mounted || _sessionStart == null || _phaseStart == null) return;
 
-    case BreathPhase.exhale:
-      ref.read(breathingPhaseProvider.notifier).state =
-          BreathPhase.inhale;
-      ref.read(breathingPhaseSecondsProvider.notifier).state = 4;
-      ref.read(breathingCycleProvider.notifier).state++;
-      break;
+    final now = DateTime.now();
+
+    final sessionElapsed = now.difference(_sessionStart!).inSeconds;
+    final remainingSession =
+    (_totalSessionSeconds - sessionElapsed).clamp(0, _totalSessionSeconds);
+
+    if (remainingSession <= 0) {
+      stopSession();
+      return;
+    }
+
+    final phaseDuration = _getPhaseDuration(state.phase);
+    final phaseElapsed = now.difference(_phaseStart!).inSeconds;
+
+    BreathPhase newPhase = state.phase;
+    int newCycle = state.cycle;
+    int newPhaseSeconds;
+
+    if (phaseElapsed >= phaseDuration) {
+      // Phase completed — advance to next
+      newPhase = _nextPhase(state.phase);
+      _phaseStart = DateTime.now();
+      // FIX: always start new phase at full duration (never 0 or negative)
+      newPhaseSeconds = _getPhaseDuration(newPhase);
+
+      if (newPhase == BreathPhase.inhale && state.phase == BreathPhase.exhale) {
+        newCycle++;
+      }
+    } else {
+      // FIX: clamp to minimum 1 so animation controller never gets <= 0
+      newPhaseSeconds = (phaseDuration - phaseElapsed).clamp(1, phaseDuration);
+    }
+
+    state = state.copyWith(
+      sessionSeconds: remainingSession,
+      phase: newPhase,
+      phaseSeconds: newPhaseSeconds,
+      cycle: newCycle,
+    );
+  }
+
+  // ---------------- HELPERS ----------------
+
+  BreathPhase _nextPhase(BreathPhase phase) {
+    switch (phase) {
+      case BreathPhase.inhale:
+        return BreathPhase.hold;
+      case BreathPhase.hold:
+        return BreathPhase.exhale;
+      case BreathPhase.exhale:
+        return BreathPhase.inhale;
+    }
+  }
+
+  int _getPhaseDuration(BreathPhase phase) {
+    switch (phase) {
+      case BreathPhase.inhale:
+        return 4;
+      case BreathPhase.hold:
+        return 7;
+      case BreathPhase.exhale:
+        return 8;
+    }
+  }
+
+  // ---------------- STOP ----------------
+
+  void stopSession() {
+    _timer?.cancel();
+    _timer = null;
+    _sessionStart = null;
+    _phaseStart = null;
+
+    if (mounted) {
+      state = state.copyWith(isRunning: false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
   }
 }

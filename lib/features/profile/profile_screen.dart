@@ -30,206 +30,197 @@ class ProfileScreen extends ConsumerWidget {
     final avatarColor =
     isPremium ? Colors.amber : Colors.deepPurple;
 
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+    // ✅ No Scaffold here — HomeScreen already provides one.
+    // A nested Scaffold causes a WidgetsBindingObserver type crash
+    // when the tab is deactivated during bottom-nav switching.
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
 
-              /// BACK + TITLE
-              Row(
+            /// TITLE — no back button, this is a bottom-nav tab
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                "Profile",
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 40),
+
+            /// PROFILE SECTION
+            Center(
+              child: Column(
                 children: [
-                  CircleAvatar(
-                    backgroundColor: Theme.of(context).cardColor,
-                    child: IconButton(
-                      icon: const Icon(Icons.arrow_back),
-                      onPressed: () => Navigator.pop(context),
+
+                  /// Avatar
+                  Container(
+                    height: 120,
+                    width: 120,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: avatarColor,
+                        width: 3,
+                      ),
+                      color: Theme.of(context).cardColor,
+                      boxShadow: [
+                        BoxShadow(
+                          color: avatarColor.withValues(alpha: 0.25),
+                          blurRadius: 20,
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: Text(
+                        firstLetter,
+                        style: TextStyle(
+                          fontSize: 48,
+                          fontWeight: FontWeight.bold,
+                          color: avatarColor,
+                        ),
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  const Text(
-                    "Profile",
-                    style: TextStyle(
+
+                  const SizedBox(height: 16),
+
+                  /// Username
+                  Text(
+                    userName,
+                    style: const TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
+
+                  const SizedBox(height: 4),
+
+                  /// Email
+                  Text(
+                    userEmail ?? "Not logged in",
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Theme.of(context)
+                          .textTheme
+                          .bodySmall
+                          ?.color,
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  /// Premium Badge
+                  if (isPremium)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Text(
+                        "🌟 PREMIUM MEMBER",
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.amber,
+                          letterSpacing: 1,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
                 ],
               ),
+            ),
 
-              const SizedBox(height: 40),
+            const SizedBox(height: 40),
 
-              /// PROFILE SECTION
-              Center(
-                child: Column(
-                  children: [
-
-                    /// Avatar
-                    Container(
-                      height: 120,
-                      width: 120,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: avatarColor,
-                          width: 3,
-                        ),
-                        color: Theme.of(context).cardColor,
-                        boxShadow: [
-                          BoxShadow(
-                            color: avatarColor.withValues(alpha: 0.25),
-                            blurRadius: 20,
-                          ),
-                        ],
-                      ),
-                      child: Center(
-                        child: Text(
-                          firstLetter,
-                          style: TextStyle(
-                            fontSize: 48,
-                            fontWeight: FontWeight.bold,
-                            color: avatarColor,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    /// Username
-                    Text(
-                      userName,
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-
-                    const SizedBox(height: 4),
-
-                    /// Email
-                    Text(
-                      userEmail ?? "Not logged in",
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Theme.of(context)
-                            .textTheme
-                            .bodySmall
-                            ?.color,
-                      ),
-                    ),
-
-                    const SizedBox(height: 8),
-
-                    /// Premium Badge
-                    if (isPremium)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.amber.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Text(
-                          "🌟 PREMIUM MEMBER",
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.amber,
-                            letterSpacing: 1,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
+            const Text(
+              "ACCOUNT MANAGEMENT",
+              style: TextStyle(
+                fontSize: 12,
+                letterSpacing: 1.5,
+                fontWeight: FontWeight.w600,
               ),
+            ),
 
-              const SizedBox(height: 40),
+            const SizedBox(height: 16),
 
-              const Text(
-                "ACCOUNT MANAGEMENT",
-                style: TextStyle(
-                  fontSize: 12,
-                  letterSpacing: 1.5,
-                  fontWeight: FontWeight.w600,
-                ),
+            _buildTile(context, Icons.person_outline, "Personal Info"),
+            _buildTile(context, Icons.notifications_none, "Notifications"),
+
+            /// 🌙 DARK MODE TOGGLE
+            Container(
+              margin: const EdgeInsets.only(bottom: 14),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 16, vertical: 18),
+              decoration: BoxDecoration(
+                color: Theme.of(context).cardColor,
+                borderRadius: BorderRadius.circular(20),
               ),
+              child: Row(
+                children: [
+                  const CircleAvatar(
+                    child: Icon(Icons.dark_mode_outlined),
+                  ),
+                  const SizedBox(width: 16),
+                  const Expanded(
+                    child: Text(
+                      "Dark Mode",
+                      style: TextStyle(fontSize: 16),
+                    ),
+                  ),
+                  Switch(
+                    value: isDark,
+                    onChanged: (value) {
+                      ref
+                          .read(themeProvider.notifier)
+                          .toggleTheme(value);
+                    },
+                  ),
+                ],
+              ),
+            ),
 
-              const SizedBox(height: 16),
+            _buildTile(context, Icons.security, "Privacy & Security"),
+            _buildTile(context, Icons.settings, "App Settings"),
 
-              _buildTile(context, Icons.person_outline, "Personal Info"),
-              _buildTile(context, Icons.notifications_none, "Notifications"),
+            const SizedBox(height: 40),
 
-              /// 🌙 DARK MODE TOGGLE
-              Container(
-                margin: const EdgeInsets.only(bottom: 14),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 18),
+            /// SIGN OUT
+            GestureDetector(
+              onTap: () {
+                ref.read(authProvider.notifier).logout();
+                // No Navigator.pop — auth state change will re-route via main.dart
+              },
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 18),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).cardColor,
+                  color: Colors.red.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: Row(
-                  children: [
-                    const CircleAvatar(
-                      child: Icon(Icons.dark_mode_outlined),
-                    ),
-                    const SizedBox(width: 16),
-                    const Expanded(
-                      child: Text(
-                        "Dark Mode",
-                        style: TextStyle(fontSize: 16),
-                      ),
-                    ),
-                    Switch(
-                      value: isDark,
-                      onChanged: (value) {
-                        ref
-                            .read(themeProvider.notifier)
-                            .toggleTheme(value);
-                      },
-                    ),
-                  ],
-                ),
-              ),
-
-              _buildTile(context, Icons.security, "Privacy & Security"),
-              _buildTile(context, Icons.settings, "App Settings"),
-
-              const SizedBox(height: 40),
-
-              /// SIGN OUT
-              GestureDetector(
-                onTap: () {
-                  ref.read(authProvider.notifier).logout();
-                  Navigator.pop(context);
-                },
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Center(
-                    child: Text(
-                      "SIGN OUT",
-                      style: TextStyle(
-                        color: Colors.red,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
+                child: const Center(
+                  child: Text(
+                    "SIGN OUT",
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
                     ),
                   ),
                 ),
               ),
+            ),
 
-              const SizedBox(height: 30),
-            ],
-          ),
+            const SizedBox(height: 30),
+          ],
         ),
       ),
     );

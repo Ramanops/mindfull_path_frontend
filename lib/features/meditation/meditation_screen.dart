@@ -2,8 +2,9 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../providers/meditation_provider.dart';
-import '../../providers/stats_provider.dart';
+import '../../features/streak/streak_provider.dart';
 
 class MeditationScreen extends ConsumerStatefulWidget {
   const MeditationScreen({super.key});
@@ -15,7 +16,7 @@ class MeditationScreen extends ConsumerStatefulWidget {
 
 class _MeditationScreenState
     extends ConsumerState<MeditationScreen>
-    with TickerProviderStateMixin {
+    with SingleTickerProviderStateMixin {
 
   Timer? _timer;
   int _remainingSeconds = 0;
@@ -24,30 +25,20 @@ class _MeditationScreenState
   @override
   void initState() {
     super.initState();
+
     final minutes = ref.read(meditationDurationProvider);
     _remainingSeconds = minutes * 60;
 
     _glowController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 4),
-      lowerBound: 0.95,
-      upperBound: 1.05,
+      duration: const Duration(seconds: 3),
+      lowerBound: 0.96,
+      upperBound: 1.04,
     );
-  }
-
-  void _exitMeditation() {
-    _timer?.cancel();
-    _glowController.stop();
-    ref.read(meditationRunningProvider.notifier).state = false;
-
-    if (mounted) {
-      Navigator.pop(context);
-    }
   }
 
   void _startTimer() {
     _timer?.cancel();
-
     final totalSeconds =
         ref.read(meditationDurationProvider) * 60;
 
@@ -58,23 +49,21 @@ class _MeditationScreenState
     ref.read(meditationRunningProvider.notifier).state = true;
     _glowController.repeat(reverse: true);
 
-    _timer = Timer.periodic(
-      const Duration(seconds: 1),
-          (timer) {
-        if (_remainingSeconds <= 0) {
-          timer.cancel();
-          _glowController.stop();
-          ref.read(meditationRunningProvider.notifier).state = false;
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) return;
 
-          ref.read(streakProvider.notifier).state++;
-          ref.read(focusProvider.notifier).state = "Deep Focus";
-        } else {
-          setState(() {
-            _remainingSeconds--;
-          });
-        }
-      },
-    );
+      if (_remainingSeconds > 0) {
+        setState(() => _remainingSeconds--);
+      } else {
+        timer.cancel();
+        _glowController.stop();
+        ref.read(meditationRunningProvider.notifier).state = false;
+
+        ref
+            .read(streakProvider.notifier)
+            .completeActivity(ActivityType.meditation);
+      }
+    });
   }
 
   void _pauseTimer() {
@@ -87,11 +76,8 @@ class _MeditationScreenState
     _timer?.cancel();
     _glowController.stop();
     final minutes = ref.read(meditationDurationProvider);
+    setState(() => _remainingSeconds = minutes * 60);
     ref.read(meditationRunningProvider.notifier).state = false;
-
-    setState(() {
-      _remainingSeconds = minutes * 60;
-    });
   }
 
   double _progress(int totalSeconds) {
@@ -118,36 +104,32 @@ class _MeditationScreenState
     ref.watch(meditationDurationProvider);
     final isRunning =
     ref.watch(meditationRunningProvider);
-    final streak = ref.watch(streakProvider);
-    final focus = ref.watch(focusProvider);
 
     final totalSeconds = selectedMinutes * 60;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0F1220),
+      backgroundColor: const Color(0xFF0E1220),
       body: SafeArea(
-        child: Padding(
-          padding:
-          const EdgeInsets.symmetric(horizontal: 20),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Column(
             children: [
 
-              /// TOP BAR
+              /// 🔙 TOP BAR
               Row(
                 children: [
                   IconButton(
                     icon: const Icon(Icons.arrow_back,
                         color: Colors.white),
-                    onPressed: _exitMeditation,
+                    onPressed: () => Navigator.pop(context),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 4),
                   const Text(
                     "Meditation",
                     style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                    ),
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600),
                   ),
                   const Spacer(),
                   const Icon(Icons.more_vert,
@@ -155,116 +137,126 @@ class _MeditationScreenState
                 ],
               ),
 
-              const SizedBox(height: 30),
+              const SizedBox(height: 40),
 
-              /// TIMER
-              Center(
-                child: AnimatedBuilder(
-                  animation: _glowController,
-                  builder: (_, __) {
-                    return Transform.scale(
-                      scale: _glowController.value,
-                      child: Container(
-                        height: 260,
-                        width: 260,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF8B5CF6)
-                                  .withOpacity(0.4),
-                              blurRadius: 40,
-                              spreadRadius: 5,
-                            )
-                          ],
-                        ),
-                        child: CustomPaint(
-                          painter:
-                          _CircleProgressPainter(
-                            progress:
-                            _progress(totalSeconds),
+              /// 🟣 TIMER RING
+              AnimatedBuilder(
+                animation: _glowController,
+                builder: (_, __) => Transform.scale(
+                  scale: isRunning ? _glowController.value : 1,
+                  child: Container(
+                    height: 300,
+                    width: 300,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: isRunning
+                          ? [
+                        BoxShadow(
+                          color: const Color(0xFF8B5CF6)
+                              .withValues(alpha: 0.5),
+                          blurRadius: 80,
+                          spreadRadius: 20,
+                        )
+                      ]
+                          : [],
+                    ),
+                    child: CustomPaint(
+                      painter: _RingPainter(
+                        progress: _progress(totalSeconds),
+                      ),
+                      child: Center(
+                        child: Container(
+                          height: 240,
+                          width: 240,
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Color(0xFF151A2D),
                           ),
-                          child: Center(
-                            child: Column(
-                              mainAxisAlignment:
-                              MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  _formatTime(
-                                      _remainingSeconds),
-                                  style:
-                                  const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 48,
-                                    fontWeight:
-                                    FontWeight.bold,
-                                  ),
+                          child: Column(
+                            mainAxisAlignment:
+                            MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                _formatTime(_remainingSeconds),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 52,
+                                  fontWeight: FontWeight.bold,
                                 ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  isRunning
-                                      ? "STAY FOCUSED"
-                                      : "READY TO BEGIN",
-                                  style:
-                                  const TextStyle(
-                                    color:
-                                    Colors.white54,
-                                    letterSpacing: 2,
-                                    fontSize: 12,
-                                  ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                isRunning
+                                    ? "STAY FOCUSED"
+                                    : "READY TO BEGIN",
+                                style: const TextStyle(
+                                  color: Colors.white54,
+                                  fontSize: 12,
+                                  letterSpacing: 2,
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
-                    );
-                  },
+                    ),
+                  ),
                 ),
               ),
 
-              const SizedBox(height: 30),
+              const SizedBox(height: 40),
 
-              /// DURATION SELECTOR
+              /// SELECT LABEL
+              const Text(
+                "SELECT DURATION",
+                style: TextStyle(
+                    color: Colors.white38,
+                    fontSize: 12,
+                    letterSpacing: 2),
+              ),
+
+              const SizedBox(height: 20),
+
+              /// ⏱ DURATION SELECTOR
               Row(
                 mainAxisAlignment:
-                MainAxisAlignment.spaceEvenly,
+                MainAxisAlignment.spaceBetween,
                 children: [1, 5, 10, 15].map((m) {
-                  final selected =
-                      selectedMinutes == m;
+                  final selected = selectedMinutes == m;
 
                   return GestureDetector(
                     onTap: () {
-                      ref
-                          .read(
-                          meditationDurationProvider
-                              .notifier)
+                      ref.read(
+                          meditationDurationProvider.notifier)
                           .state = m;
                       _resetTimer();
                     },
-                    child: Container(
+                    child: AnimatedContainer(
+                      duration:
+                      const Duration(milliseconds: 250),
+                      width: 65,
                       padding:
-                      const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 12),
+                      const EdgeInsets.symmetric(vertical: 14),
                       decoration: BoxDecoration(
                         color: selected
-                            ? const Color(
-                            0xFF8B5CF6)
+                            ? const Color(0xFF8B5CF6)
                             : Colors.transparent,
                         borderRadius:
-                        BorderRadius.circular(
-                            20),
+                        BorderRadius.circular(20),
                         border: Border.all(
-                            color:
-                            Colors.white24),
-                      ),
-                      child: Text(
-                        "${m}m",
-                        style: TextStyle(
                           color: selected
-                              ? Colors.white
-                              : Colors.white54,
+                              ? const Color(0xFF8B5CF6)
+                              : Colors.white12,
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          "${m}m",
+                          style: TextStyle(
+                            color: selected
+                                ? Colors.white
+                                : Colors.white54,
+                          ),
                         ),
                       ),
                     ),
@@ -272,42 +264,72 @@ class _MeditationScreenState
                 }).toList(),
               ),
 
-              const SizedBox(height: 30),
+              const SizedBox(height: 35),
 
-              /// CONTROLS
+              /// ▶ CONTROLS
               Row(
                 mainAxisAlignment:
                 MainAxisAlignment.spaceEvenly,
                 children: [
-                  _smallCircleButton(
-                      Icons.refresh,
-                      _resetTimer),
-                  _bigPlayButton(isRunning),
-                  _smallCircleButton(
-                      Icons.info_outline,
-                          () {}),
+                  _circleIcon(Icons.refresh, _resetTimer),
+                  GestureDetector(
+                    onTap:
+                    isRunning ? _pauseTimer : _startTimer,
+                    child: Container(
+                      height: 85,
+                      width: 85,
+                      decoration:
+                      const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white,
+                      ),
+                      child: Icon(
+                        isRunning
+                            ? Icons.pause
+                            : Icons.play_arrow,
+                        size: 42,
+                        color:
+                        const Color(0xFF8B5CF6),
+                      ),
+                    ),
+                  ),
+                  _circleIcon(Icons.info_outline, () {}),
                 ],
               ),
 
-              const Spacer(),
+              const SizedBox(height: 50),
 
-              /// STATS
-              Row(
-                mainAxisAlignment:
-                MainAxisAlignment.spaceBetween,
-                children: [
-                  _StatItem(
-                    title: "CURRENT STREAK",
-                    value: "$streak Days",
-                  ),
-                  _StatItem(
-                    title: "TODAY'S FOCUS",
-                    value: focus,
-                  ),
-                ],
+              /// 🧠 Meditation Tips Card
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF151A2D),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Column(
+                  crossAxisAlignment:
+                  CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Meditation Tips",
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600),
+                    ),
+                    SizedBox(height: 10),
+                    Text(
+                      "Find a comfortable position. Focus on your breath. "
+                          "If your mind wanders, gently bring it back.",
+                      style: TextStyle(
+                          color: Colors.white54,
+                          height: 1.5),
+                    )
+                  ],
+                ),
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 60),
             ],
           ),
         ),
@@ -315,128 +337,69 @@ class _MeditationScreenState
     );
   }
 
-  Widget _smallCircleButton(
+  Widget _circleIcon(
       IconData icon, VoidCallback onTap) {
-    return Container(
-      height: 55,
-      width: 55,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border:
-        Border.all(color: Colors.white24),
-      ),
-      child: IconButton(
-        icon: Icon(icon,
-            color: Colors.white70),
-        onPressed: onTap,
-      ),
-    );
-  }
-
-  Widget _bigPlayButton(bool isRunning) {
-    return Container(
-      height: 80,
-      width: 80,
-      decoration: const BoxDecoration(
-        shape: BoxShape.circle,
-        color: Colors.white,
-      ),
-      child: IconButton(
-        icon: Icon(
-          isRunning
-              ? Icons.pause
-              : Icons.play_arrow,
-          size: 40,
-          color: const Color(0xFF8B5CF6),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 55,
+        width: 55,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white12),
         ),
-        onPressed:
-        isRunning ? _pauseTimer : _startTimer,
+        child:
+        Icon(icon, color: Colors.white70),
       ),
     );
   }
 }
 
-class _CircleProgressPainter
-    extends CustomPainter {
+class _RingPainter extends CustomPainter {
   final double progress;
 
-  _CircleProgressPainter(
-      {required this.progress});
+  _RingPainter({required this.progress});
 
   @override
   void paint(Canvas canvas, Size size) {
-    final strokeWidth = 6.0;
+    const strokeWidth = 8.0;
     final center =
-    Offset(size.width / 2,
-        size.height / 2);
+    Offset(size.width / 2, size.height / 2);
     final radius =
         size.width / 2 - strokeWidth;
 
-    final bgPaint = Paint()
-      ..color = Colors.white24
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth;
-
-    final progressPaint = Paint()
-      ..color = const Color(0xFF8B5CF6)
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
-      ..strokeWidth = strokeWidth;
-
     canvas.drawCircle(
-        center, radius, bgPaint);
+      center,
+      radius,
+      Paint()
+        ..color = Colors.white10
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth,
+    );
+
+    final gradient = const LinearGradient(
+      colors: [
+        Color(0xFF8B5CF6),
+        Color(0xFF6366F1),
+      ],
+    );
 
     canvas.drawArc(
-      Rect.fromCircle(
-          center: center,
-          radius: radius),
+      Rect.fromCircle(center: center, radius: radius),
       -pi / 2,
       2 * pi * progress,
       false,
-      progressPaint,
+      Paint()
+        ..shader = gradient.createShader(
+            Rect.fromCircle(center: center, radius: radius))
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeWidth = strokeWidth,
     );
   }
 
   @override
   bool shouldRepaint(
-      covariant _CircleProgressPainter
-      oldDelegate) =>
+      covariant _RingPainter oldDelegate) =>
       oldDelegate.progress != progress;
-}
-
-class _StatItem extends StatelessWidget {
-  final String title;
-  final String value;
-
-  const _StatItem({
-    required this.title,
-    required this.value,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment:
-      CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(
-            color: Colors.white38,
-            fontSize: 12,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight:
-            FontWeight.bold,
-          ),
-        ),
-      ],
-    );
-  }
 }

@@ -24,30 +24,60 @@ class _BreathingCircleState
       lowerBound: 0.85,
       upperBound: 1.15,
     );
+
+    // ✅ Listen to state changes OUTSIDE of build() using the new
+    // single breathingProvider. We use a selector on `phase` so this
+    // listener only fires when the phase changes — not on every
+    // seconds tick — keeping animation starts to exactly once per phase.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.listenManual(
+        breathingProvider.select((s) => s.phase),
+            (previous, phase) {
+          // Guard: don't animate if session has already stopped
+          if (!ref.read(breathingProvider).isRunning) return;
+          // Guard: don't re-trigger if phase didn't actually change
+          if (previous == phase) return;
+
+          switch (phase) {
+            case BreathPhase.inhale:
+              _controller.duration = const Duration(seconds: 4);
+              _controller.forward();
+              break;
+            case BreathPhase.hold:
+            // Circle stays expanded during hold
+              _controller.stop();
+              break;
+            case BreathPhase.exhale:
+              _controller.duration = const Duration(seconds: 8);
+              _controller.reverse();
+              break;
+          }
+        },
+      );
+
+      // ✅ Listen to isRunning so we smoothly reset when session ends
+      ref.listenManual(
+        breathingProvider.select((s) => s.isRunning),
+            (previous, isRunning) {
+          if (!isRunning) {
+            _controller.stop();
+            _controller.animateTo(
+              _controller.lowerBound,
+              duration: const Duration(milliseconds: 600),
+            );
+          }
+        },
+      );
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final running =
-        ref.watch(breathingRunningProvider);
-    final phase =
-        ref.watch(breathingPhaseProvider);
-    final seconds =
-        ref.watch(breathingPhaseSecondsProvider);
-
-    if (running) {
-      if (phase == BreathPhase.inhale) {
-        _controller.duration =
-            const Duration(seconds: 4);
-        _controller.forward();
-      } else if (phase == BreathPhase.exhale) {
-        _controller.duration =
-            const Duration(seconds: 8);
-        _controller.reverse();
-      }
-    }
-
-    String phaseText = phase.name.toUpperCase();
+    // ✅ Select only the two fields this widget needs to render.
+    // Rebuilds only when phase or phaseSeconds changes — not isRunning,
+    // cycle, sessionSeconds, etc.
+    final phase = ref.watch(breathingProvider.select((s) => s.phase));
+    final seconds = ref.watch(breathingProvider.select((s) => s.phaseSeconds));
 
     return AnimatedBuilder(
       animation: _controller,
@@ -69,29 +99,26 @@ class _BreathingCircleState
                 BoxShadow(
                   blurRadius: 40,
                   spreadRadius: 10,
-                  color:
-                      Colors.blue.withOpacity(0.3),
+                  color: Colors.blue.withOpacity(0.3),
                 )
               ],
             ),
             child: Center(
               child: Column(
-                mainAxisAlignment:
-                    MainAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    phaseText,
+                    phase.name.toUpperCase(),
                     style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight:
-                            FontWeight.bold),
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const SizedBox(height: 6),
                   Text(
                     "$seconds s",
-                    style: const TextStyle(
-                        color: Colors.white70),
+                    style: const TextStyle(color: Colors.white70),
                   ),
                 ],
               ),
