@@ -23,10 +23,7 @@ class _MoodCheckinScreenState extends ConsumerState<MoodCheckinScreen> {
         'moodType': selected.name,
         'intensity': _intensity,
       });
-      setState(() {
-        _submitted = true;
-        _loading = false;
-      });
+      setState(() { _submitted = true; _loading = false; });
     } catch (e) {
       setState(() => _loading = false);
       if (mounted) {
@@ -40,6 +37,7 @@ class _MoodCheckinScreenState extends ConsumerState<MoodCheckinScreen> {
   @override
   Widget build(BuildContext context) {
     final selected = ref.watch(selectedMoodProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Mood Check-in')),
@@ -51,8 +49,7 @@ class _MoodCheckinScreenState extends ConsumerState<MoodCheckinScreen> {
                   const Text('✅', style: TextStyle(fontSize: 64)),
                   const SizedBox(height: 16),
                   const Text('Mood saved!',
-                      style:
-                          TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 24),
                   ElevatedButton(
                     onPressed: () => Navigator.pop(context),
@@ -67,26 +64,26 @@ class _MoodCheckinScreenState extends ConsumerState<MoodCheckinScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text('How are you feeling?',
-                      style:
-                          TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 24),
 
-                  // Mood selector
+                  // ✅ Mood selector — dark mode aware
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: moodList.map((mood) {
                       final isSelected = selected.name == mood.name;
                       return GestureDetector(
-                        onTap: () => ref
-                            .read(selectedMoodProvider.notifier)
-                            .state = mood,
+                        onTap: () => ref.read(selectedMoodProvider.notifier).state = mood,
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
+                            // ✅ FIXED: dark mode uses dark surface, not grey.shade100
                             color: isSelected
-                                ? const Color(0xFF6C63FF).withOpacity(0.15)
-                                : Colors.grey.shade100,
+                                ? const Color(0xFF6C63FF).withOpacity(0.2)
+                                : isDark
+                                    ? const Color(0xFF1E2035)
+                                    : Colors.grey.shade100,
                             border: Border.all(
                               color: isSelected
                                   ? const Color(0xFF6C63FF)
@@ -100,8 +97,14 @@ class _MoodCheckinScreenState extends ConsumerState<MoodCheckinScreen> {
                               Text(mood.emoji,
                                   style: const TextStyle(fontSize: 32)),
                               const SizedBox(height: 6),
-                              Text(mood.name,
-                                  style: const TextStyle(fontSize: 12)),
+                              // ✅ FIXED: text color adapts to theme
+                              Text(
+                                mood.name,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Theme.of(context).colorScheme.onSurface,
+                                ),
+                              ),
                             ],
                           ),
                         ),
