@@ -3,13 +3,12 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class ApiClient {
   late Dio dio;
-  final FlutterSecureStorage storage =
-  const FlutterSecureStorage();
+  final FlutterSecureStorage storage = const FlutterSecureStorage();
 
   ApiClient() {
     dio = Dio(
       BaseOptions(
-        baseUrl: "http://10.0.2.2:3000/api",
+        baseUrl: "http://localhost:3000/api",
         headers: {
           'Content-Type': 'application/json',
         },
@@ -22,8 +21,7 @@ class ApiClient {
           final token = await storage.read(key: 'access_token');
 
           if (token != null) {
-            options.headers['Authorization'] =
-            'Bearer $token';
+            options.headers['Authorization'] = 'Bearer $token';
           }
 
           return handler.next(options);
@@ -34,9 +32,9 @@ class ApiClient {
 
   // ✅ Add this
   Future<dynamic> post(
-      String path,
-      Map<String, dynamic> data,
-      ) async {
+    String path,
+    Map<String, dynamic> data,
+  ) async {
     final response = await dio.post(path, data: data);
     return response.data;
   }

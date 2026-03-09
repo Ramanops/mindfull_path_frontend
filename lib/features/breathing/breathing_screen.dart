@@ -11,13 +11,7 @@ class BreathingPattern {
   final int inhale;
   final int hold;
   final int exhale;
-
-  const BreathingPattern({
-    required this.name,
-    required this.inhale,
-    required this.hold,
-    required this.exhale,
-  });
+  const BreathingPattern({required this.name, required this.inhale, required this.hold, required this.exhale});
 }
 
 final patterns = [
@@ -27,10 +21,8 @@ final patterns = [
 
 class BreathingScreen extends ConsumerStatefulWidget {
   const BreathingScreen({super.key});
-
   @override
-  ConsumerState<BreathingScreen> createState() =>
-      _BreathingScreenState();
+  ConsumerState<BreathingScreen> createState() => _BreathingScreenState();
 }
 
 class _BreathingScreenState extends ConsumerState<BreathingScreen>
@@ -38,15 +30,11 @@ class _BreathingScreenState extends ConsumerState<BreathingScreen>
 
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
-
   Timer? _timer;
-
   final int _totalSeconds = 300;
   int _remainingSeconds = 300;
-
   BreathPhase _phase = BreathPhase.inhale;
   int _phaseSecondsLeft = 0;
-
   bool _running = false;
   int _selectedIndex = 0;
 
@@ -55,19 +43,10 @@ class _BreathingScreenState extends ConsumerState<BreathingScreen>
   @override
   void initState() {
     super.initState();
-
     _controller = AnimationController(vsync: this);
-
-    _scaleAnimation = Tween<double>(
-      begin: 0.85,
-      end: 1.1,
-    ).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: Curves.easeInOut,
-      ),
+    _scaleAnimation = Tween<double>(begin: 0.85, end: 1.1).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
     );
-
     _setPhase(BreathPhase.inhale);
   }
 
@@ -80,9 +59,7 @@ class _BreathingScreenState extends ConsumerState<BreathingScreen>
 
   void _setPhase(BreathPhase phase) {
     _phase = phase;
-
     int duration;
-
     if (phase == BreathPhase.inhale) {
       duration = pattern.inhale;
       _controller.duration = Duration(seconds: duration);
@@ -95,39 +72,27 @@ class _BreathingScreenState extends ConsumerState<BreathingScreen>
       _controller.duration = Duration(seconds: duration);
       _controller.reverse(from: 1);
     }
-
     _phaseSecondsLeft = duration;
   }
 
   void _startBreathing() {
     if (_running) return;
-
     setState(() {
       _running = true;
       _remainingSeconds = _totalSeconds;
       _setPhase(BreathPhase.inhale);
     });
-
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) return;
-
       setState(() {
         _remainingSeconds--;
         _phaseSecondsLeft--;
-
         if (_phaseSecondsLeft <= 0) {
-          if (_phase == BreathPhase.inhale) {
-            _setPhase(BreathPhase.hold);
-          } else if (_phase == BreathPhase.hold) {
-            _setPhase(BreathPhase.exhale);
-          } else {
-            _setPhase(BreathPhase.inhale);
-          }
+          if (_phase == BreathPhase.inhale) _setPhase(BreathPhase.hold);
+          else if (_phase == BreathPhase.hold) _setPhase(BreathPhase.exhale);
+          else _setPhase(BreathPhase.inhale);
         }
-
-        if (_remainingSeconds <= 0) {
-          _finishSession();
-        }
+        if (_remainingSeconds <= 0) _finishSession();
       });
     });
   }
@@ -136,11 +101,7 @@ class _BreathingScreenState extends ConsumerState<BreathingScreen>
     _timer?.cancel();
     _controller.stop();
     _running = false;
-
-    ref
-        .read(streakProvider.notifier)
-        .completeActivity(ActivityType.breathing);
-
+    ref.read(streakProvider.notifier).completeActivity(ActivityType.breathing);
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -148,10 +109,7 @@ class _BreathingScreenState extends ConsumerState<BreathingScreen>
         content: const Text("Beautiful breathing work today!"),
         actions: [
           TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _exitToHome();
-            },
+            onPressed: () { Navigator.pop(context); _exitToHome(); },
             child: const Text("Done"),
           )
         ],
@@ -167,12 +125,9 @@ class _BreathingScreenState extends ConsumerState<BreathingScreen>
 
   String get phaseText {
     switch (_phase) {
-      case BreathPhase.inhale:
-        return "INHALE";
-      case BreathPhase.hold:
-        return "HOLD";
-      case BreathPhase.exhale:
-        return "EXHALE";
+      case BreathPhase.inhale: return "INHALE";
+      case BreathPhase.hold: return "HOLD";
+      case BreathPhase.exhale: return "EXHALE";
     }
   }
 
@@ -185,67 +140,57 @@ class _BreathingScreenState extends ConsumerState<BreathingScreen>
 
   @override
   Widget build(BuildContext context) {
+    // ✅ Theme-aware colors — works in both light and dark mode
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final cardColor = isDark ? const Color(0xFF1E2035) : Colors.white;
+    final selectedTileColor = isDark ? const Color(0xFF2A2B50) : const Color(0xFFE8E9FF);
+    final unselectedTileColor = isDark ? const Color(0xFF161728) : Colors.white;
+    final borderColor = isDark ? Colors.grey.shade700 : Colors.grey.shade300;
+
     return PopScope(
       canPop: false,
-      onPopInvokedWithResult: (didPop, result) {
-        if (!didPop) _exitToHome();
-      },
+      onPopInvokedWithResult: (didPop, result) { if (!didPop) _exitToHome(); },
       child: Scaffold(
-        backgroundColor: const Color(0xFFF4F5FA),
+        // ✅ No hardcoded backgroundColor — uses theme's scaffoldBackgroundColor
         body: SafeArea(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-
-                /// HEADER
+                // HEADER
                 Row(
                   children: [
-                    IconButton(
-                      onPressed: _exitToHome,
-                      icon: const Icon(Icons.arrow_back),
-                    ),
+                    IconButton(onPressed: _exitToHome, icon: const Icon(Icons.arrow_back)),
                     const SizedBox(width: 8),
-                    const Text(
-                      "Breathing",
-                      style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600),
-                    ),
+                    const Text("Breathing", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
                     const Spacer(),
-                    const Icon(Icons.info_outline)
+                    const Icon(Icons.info_outline),
                   ],
                 ),
 
                 const SizedBox(height: 20),
 
-                /// TOP CARD
+                // TOP CARD — uses theme-aware cardColor
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: cardColor,
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: [
-                      BoxShadow(
-                        blurRadius: 15,
-                        color: Colors.black.withValues(alpha: 0.05),
-                      )
+                      BoxShadow(blurRadius: 15, color: Colors.black.withOpacity(isDark ? 0.3 : 0.05)),
                     ],
                   ),
                   child: Column(
                     children: [
-
-                      const Text(
-                        "Find Your Center",
-                        style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold),
-                      ),
+                      Text("Find Your Center",
+                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.onSurface)),
 
                       const SizedBox(height: 20),
 
-                      /// BREATHING ORB WITH PHASE
+                      // BREATHING ORB — gradient stays, always visible
                       AnimatedBuilder(
                         animation: _scaleAnimation,
                         builder: (_, __) => Transform.scale(
@@ -256,33 +201,17 @@ class _BreathingScreenState extends ConsumerState<BreathingScreen>
                             decoration: const BoxDecoration(
                               shape: BoxShape.circle,
                               gradient: LinearGradient(
-                                colors: [
-                                  Color(0xFF8E9FFF),
-                                  Color(0xFF6C63FF),
-                                ],
+                                colors: [Color(0xFF8E9FFF), Color(0xFF6C63FF)],
                               ),
                             ),
                             child: Column(
-                              mainAxisAlignment:
-                              MainAxisAlignment.center,
+                              mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Text(
-                                  phaseText,
-                                  style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 18,
-                                      fontWeight:
-                                      FontWeight.bold),
-                                ),
+                                Text(phaseText,
+                                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                                 const SizedBox(height: 6),
-                                Text(
-                                  _phaseSecondsLeft.toString(),
-                                  style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 28,
-                                      fontWeight:
-                                      FontWeight.bold),
-                                ),
+                                Text(_phaseSecondsLeft.toString(),
+                                    style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
                               ],
                             ),
                           ),
@@ -291,33 +220,21 @@ class _BreathingScreenState extends ConsumerState<BreathingScreen>
 
                       const SizedBox(height: 20),
 
-                      /// SESSION TIMER
-                      Text(
-                        formattedTime,
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                      Text(formattedTime,
+                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600,
+                              color: theme.colorScheme.onSurface)),
 
                       const SizedBox(height: 20),
 
                       ElevatedButton.icon(
-                        onPressed:
-                        _running ? null : _startBreathing,
+                        onPressed: _running ? null : _startBreathing,
                         icon: const Icon(Icons.play_arrow),
                         label: const Text("START BREATHING"),
                         style: ElevatedButton.styleFrom(
-                          minimumSize:
-                          const Size.fromHeight(55),
-                          backgroundColor:
-                          const Color(0xFF6C63FF),
-                          foregroundColor:
-                          Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius:
-                            BorderRadius.circular(30),
-                          ),
+                          minimumSize: const Size.fromHeight(55),
+                          backgroundColor: const Color(0xFF6C63FF),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                         ),
                       ),
                     ],
@@ -326,56 +243,36 @@ class _BreathingScreenState extends ConsumerState<BreathingScreen>
 
                 const SizedBox(height: 30),
 
-                /// SELECT PATTERN
-                const Text(
-                  "Select a Pattern",
-                  style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold),
-                ),
+                Text("Select a Pattern",
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onSurface)),
 
                 const SizedBox(height: 12),
 
                 Column(
                   children: List.generate(patterns.length, (index) {
                     final selected = index == _selectedIndex;
-
                     return GestureDetector(
-                      onTap: () {
-                        if (_running) return;
-                        setState(() => _selectedIndex = index);
-                      },
+                      onTap: () { if (!_running) setState(() => _selectedIndex = index); },
                       child: Container(
-                        margin:
-                        const EdgeInsets.only(bottom: 12),
-                        padding:
-                        const EdgeInsets.all(16),
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: selected
-                              ? const Color(0xFFE8E9FF)
-                              : Colors.white,
-                          borderRadius:
-                          BorderRadius.circular(16),
+                          // ✅ Theme-aware tile colors
+                          color: selected ? selectedTileColor : unselectedTileColor,
+                          borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                            color: selected
-                                ? const Color(0xFF6C63FF)
-                                : Colors.grey.shade300,
+                            color: selected ? const Color(0xFF6C63FF) : borderColor,
                           ),
                         ),
                         child: Row(
                           children: [
                             Expanded(
-                              child: Text(
-                                patterns[index].name,
-                                style: const TextStyle(
-                                    fontWeight:
-                                    FontWeight.w600),
-                              ),
+                              child: Text(patterns[index].name,
+                                  style: TextStyle(fontWeight: FontWeight.w600,
+                                      color: theme.colorScheme.onSurface)),
                             ),
-                            if (selected)
-                              const Icon(Icons.check,
-                                  color:
-                                  Color(0xFF6C63FF))
+                            if (selected) const Icon(Icons.check, color: Color(0xFF6C63FF)),
                           ],
                         ),
                       ),

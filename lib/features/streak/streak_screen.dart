@@ -8,11 +8,16 @@ class StreakScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final streak = ref.watch(streakProvider);
-
     final weekData = _buildLast7Days(streak);
 
+    // ✅ Theme-aware — no hardcoded background
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final doneColor = const Color(0xFF8B5CF6);
+    final emptyColor = isDark ? Colors.grey.shade800 : Colors.grey.shade300;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F7FB),
+      // ✅ Removed hardcoded Color(0xFFF6F7FB) — now uses theme scaffold color
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(20),
@@ -21,27 +26,28 @@ class StreakScreen extends ConsumerWidget {
             children: [
               const SizedBox(height: 20),
 
-              /// 🔥 Current Streak
               Text(
                 "🔥 ${streak.currentStreak} Day Streak",
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 26,
                   fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.onSurface, // ✅ adapts to dark/light
                 ),
               ),
 
               const SizedBox(height: 30),
 
-              const Text(
+              Text(
                 "Weekly Progress",
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.onSurface, // ✅ adapts
                 ),
               ),
 
               const SizedBox(height: 20),
 
-              /// Weekly Heatmap
+              // Weekly Heatmap
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: weekData.map((done) {
@@ -49,9 +55,7 @@ class StreakScreen extends ConsumerWidget {
                     height: 40,
                     width: 40,
                     decoration: BoxDecoration(
-                      color: done
-                          ? const Color(0xFF8B5CF6)
-                          : Colors.grey.shade300,
+                      color: done ? doneColor : emptyColor, // ✅ dark-aware empty color
                       borderRadius: BorderRadius.circular(8),
                     ),
                   );
@@ -62,8 +66,9 @@ class StreakScreen extends ConsumerWidget {
 
               Text(
                 "${weekData.where((e) => e).length}/7 days completed",
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.onSurface, // ✅ adapts
                 ),
               ),
             ],
@@ -73,17 +78,13 @@ class StreakScreen extends ConsumerWidget {
     );
   }
 
-  /// Builds last 7 days heatmap
   List<bool> _buildLast7Days(StreakState state) {
     final today = DateTime.now();
     final List<bool> result = [];
-
     for (int i = 6; i >= 0; i--) {
       final date = today.subtract(Duration(days: i));
       final key = _dateKey(date);
-
       final activities = state.dailyActivities[key];
-
       if (activities != null &&
           activities.contains(ActivityType.meditation) &&
           activities.contains(ActivityType.breathing)) {
@@ -92,11 +93,8 @@ class StreakScreen extends ConsumerWidget {
         result.add(false);
       }
     }
-
     return result;
   }
 
-  String _dateKey(DateTime date) {
-    return "${date.year}-${date.month}-${date.day}";
-  }
+  String _dateKey(DateTime date) => "${date.year}-${date.month}-${date.day}";
 }

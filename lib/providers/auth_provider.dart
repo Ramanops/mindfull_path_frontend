@@ -2,52 +2,44 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../repositories/auth_repository.dart';
 import '../core/network/api_client.dart';
 
-/// 🔹 Auth Mode Toggle
 final authModeProvider = StateProvider<bool>((ref) => true);
 
-/// 🔹 API Client
-final apiClientProvider = Provider<ApiClient>((ref) {
-  return ApiClient();
-});
+final apiClientProvider = Provider<ApiClient>((ref) => ApiClient());
 
-/// 🔹 Repository
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
-  final apiClient = ref.read(apiClientProvider);
-  return AuthRepository(apiClient);
+  return AuthRepository(ref.read(apiClientProvider));
 });
 
-/// 🔹 Auth State
-final authProvider =
-StateNotifierProvider<AuthNotifier, String?>((ref) {
-  final repository = ref.read(authRepositoryProvider);
-  return AuthNotifier(repository);
+// ✅ Now stores email (not JWT token) for display
+final authProvider = StateNotifierProvider<AuthNotifier, String?>((ref) {
+  return AuthNotifier(ref.read(authRepositoryProvider));
 });
 
 class AuthNotifier extends StateNotifier<String?> {
   final AuthRepository repository;
 
   AuthNotifier(this.repository) : super(null) {
-    _loadToken();
+    _loadSavedEmail();
   }
 
-  /// 🔄 Auto-load saved token
-  Future<void> _loadToken() async {
-    final savedToken = await repository.getSavedToken();
-    if (savedToken != null) {
-      state = savedToken;
+  /// 🔄 Load saved email on app start
+  Future<void> _loadSavedEmail() async {
+    final savedEmail = await repository.getSavedEmail();
+    if (savedEmail != null) {
+      state = savedEmail; // ✅ shows email, not token
     }
   }
 
-  /// 🔐 Login
+  /// 🔐 Login — state set to email
   Future<void> login(String email, String password) async {
-    final token = await repository.login(email, password);
-    state = token;
+    await repository.login(email, password);
+    state = email; // ✅ store email in state
   }
 
-  /// 🆕 Register
+  /// 🆕 Register — state set to email
   Future<void> register(String email, String password) async {
-    final token = await repository.register(email, password);
-    state = token;
+    await repository.register(email, password);
+    state = email; // ✅ store email in state
   }
 
   /// 🚪 Logout
