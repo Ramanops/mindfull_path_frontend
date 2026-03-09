@@ -23,6 +23,8 @@ async function bootstrap() {
   // global error handler
   app.useGlobalFilters(new SentryFilter());
 
-  await app.listen(3000);
+  // ✅ Listen on 0.0.0.0 so physical devices on same WiFi can connect
+  await app.listen(3000, '0.0.0.0');
+  console.log(`🚀 Server running on http://10.21.8.78:3000`);
 }
 bootstrap();
