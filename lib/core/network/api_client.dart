@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class ApiClient {
@@ -8,7 +9,7 @@ class ApiClient {
   ApiClient() {
     dio = Dio(
       BaseOptions(
-        baseUrl: "http://10.21.8.78:3000/api",
+        baseUrl: "http://10.7.231.253:3000/api",
         headers: {
           'Content-Type': 'application/json',
         },
@@ -32,9 +33,9 @@ class ApiClient {
 
   // ✅ Add this
   Future<dynamic> post(
-    String path,
-    Map<String, dynamic> data,
-  ) async {
+      String path,
+      Map<String, dynamic> data,
+      ) async {
     final response = await dio.post(path, data: data);
     return response.data;
   }

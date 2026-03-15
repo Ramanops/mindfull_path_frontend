@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'providers/theme_provider.dart';
 import 'providers/auth_provider.dart';
 import 'theme/app_theme.dart';
@@ -7,6 +8,9 @@ import 'features/auth/login_screen.dart';
 import 'features/home/home_screen.dart';
 
 void main() {
+  WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
+
   runApp(
     const ProviderScope(
       child: MindfulPathApp(),
@@ -21,6 +25,9 @@ class MindfulPathApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeProvider);
     final token = ref.watch(authProvider);
+
+    // Removes native splash once auth state is loaded
+    FlutterNativeSplash.remove();
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
